@@ -9,14 +9,26 @@
 #define NETWORK_H
 
 #include <stdio.h>
+#include <semaphore.h>
+
 
 typedef struct Request Request;
 typedef struct Node Node;
 typedef struct Queue Queue;
 
+
+
+typedef sem_t Semaphore;
+Semaphore *make_semaphore(int value);
+void semaphore_wait(Semaphore *sem);
+void semaphore_signal(Semaphore *sem);
+
+
+
 struct Request{
 	int sequence;
 	int fileDes;
+	char *filePath;
 	FILE *file;
 	int remainingBytes;
 	int quantum;
@@ -35,15 +47,17 @@ struct Queue{
 	Node *tail;
 	int quantum;
 	unsigned int nodeNumber;
+	Semaphore *mutex;
+	//Semaphore *nodes;
 };
+int _construct(Queue *queue);
 int construct(Queue *queue,int quantum);
 void destroy(Queue *queue);
 Request* queue_pop(Queue *queue);
 Request* queue_shortest(Queue *queue);
 int queue_push(Queue *queue,Request *request);
 void perror_exit (char *s);
-
-
+void * check_malloc(int size);
 
 
 

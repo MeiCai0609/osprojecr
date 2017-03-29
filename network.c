@@ -31,6 +31,15 @@ int construct(Queue *queue,int quantum){
   }
   queue->nodeNumber = 0;
   queue->quantum = quantum;
+  queue->mutex = make_semaphore(1);
+  return 0;
+}
+int _construct(Queue *queue){
+  if (queue == NULL){
+    return -1;
+  }
+  queue->nodeNumber = 0;
+  queue->mutex = make_semaphore(1);
   return 0;
 }
 
@@ -45,11 +54,14 @@ void destroy(Queue *queue){
 }
 
 int queue_push(Queue *queue,Request *request){
+  semaphore_wait(queue->mutex);
   if(queue == NULL){
+    semaphore_signal(queue->mutex);
     return -1;
   }
   Node *new=(Node*)malloc(sizeof(Node));
   if(!new){
+    semaphore_signal(queue->mutex);
     return -1;
   }
   new->request = request;
@@ -62,18 +74,19 @@ int queue_push(Queue *queue,Request *request){
     queue->tail->next = new;
     queue->tail = new;
   }
-  //printf("Before push :node Number is : %d\n",queue->nodeNumber );
   queue->nodeNumber++;
-  //printf("After push :node Number is : %d\n",queue->nodeNumber );
+  semaphore_signal(queue->mutex);
   return 0;
 }
 
 Request* queue_pop(Queue *queue){
+  semaphore_wait(queue->mutex);
   if (queue == NULL){
+    semaphore_signal(queue->mutex);
     return NULL;
   }
   if(queue->nodeNumber == 0){
-    //printf("%s\n", "The queue is empty. Start waiting...");
+    semaphore_signal(queue->mutex);
     return NULL;
   }
   Node *head = queue->head;
@@ -84,15 +97,18 @@ Request* queue_pop(Queue *queue){
   }
   free(head);
   queue->nodeNumber--;
+  semaphore_signal(queue->mutex);
   return request;
 }
 
 Request* queue_shortest(Queue *queue){
+  semaphore_wait(queue->mutex);
   if(queue == NULL){
+    semaphore_signal(queue->mutex);
     return NULL;
   }
   if(queue->nodeNumber == 0){
-    printf("%s\n", "The queue is empty now. Start waiting...");
+    semaphore_signal(queue->mutex);
     return NULL;
   }
   Node *head = queue->head;
@@ -109,6 +125,7 @@ Request* queue_shortest(Queue *queue){
     head = head->next;
   } 
   if (previous == NULL){
+    semaphore_signal(queue->mutex);
     return queue_pop(queue);
   }
   else{
@@ -124,6 +141,7 @@ Request* queue_shortest(Queue *queue){
     }
     queue->nodeNumber--;
   }
+  semaphore_signal(queue->mutex);
   return request;
 }
 void perror_exit (char *s)
@@ -132,7 +150,14 @@ void perror_exit (char *s)
 }
 
 
-
+void * check_malloc(int size){
+  void * p = malloc(size);
+  if (p == 0){
+    perror("malloc failed.");
+    exit(-1);
+  }
+  return p;
+}
 
 
 
@@ -259,6 +284,37 @@ extern void network_init( int port ) {
     abort();
   }
 }
+
+
+
+
+
+//Task 2. Functions.
+//Wrap the sem_init
+Semaphore *make_semaphore(int value){
+  Semaphore *sem = check_malloc(sizeof(Semaphore));
+  int n = sem_init(sem,0,value);
+  if (n != 0){
+    perror_exit("sem_init failed.");
+  }
+  return sem;
+}
+
+//Wrap the sem_wait
+void semaphore_wait(Semaphore *sem){
+  int n = sem_wait(sem);
+  if (n != 0){
+    perror_exit("sem_wait failed.");
+  }
+}
+//Wrap the sem_post
+void semaphore_signal(Semaphore *sem){
+  int n = sem_post(sem);
+  if (n !=0 ){
+    perror_exit("sem_post failed.");
+  }
+}
+
 
 
 
