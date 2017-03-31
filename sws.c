@@ -345,6 +345,7 @@ void preprocessingRequest(Request *request){
     len = sprintf( buffer, "HTTP/1.1 400 Bad request\n\n" );
     write( request->fileDes, buffer, len );                       /* if not, send err */
     close( request->fileDes );                                     /* close client connection*/
+    free(request);
   } else {                                          /* if so, open file */
     req++;                                          /* skip leading / */
     fin = fopen( req, "r" );                        /* open file */
@@ -352,6 +353,7 @@ void preprocessingRequest(Request *request){
       len = sprintf( buffer, "HTTP/1.1 404 File not found\n\n" );  
       write( request->fileDes, buffer, len );                     /* if not, send err */
       close( request->fileDes );                                     /* close client connection*/
+      free(request);
     } else {                                         /* if so, send file */
       struct stat st;
       stat(req, &st);
