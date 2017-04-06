@@ -21,7 +21,7 @@
 #define HIGHEST_QUANTUM 2
 #define MEDIUM_QUANTUM 4
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#define MAX_REQUESTS 100
+#define MAX_REQUESTS 3
 
 Queue SJF;
 Queue RR;
@@ -147,7 +147,7 @@ void serve_client( int fd ) {
  */
 int main( int argc, char **argv ) {
   int port = -1;                                    /* server port # */
-  int fd;                                           /* client file descriptor */
+  int fd=0;                                           /* client file descriptor */
   char *scheduler = malloc(sizeof(char)*5); 
   int workerNumber;
   pthread_t *workers;
@@ -208,9 +208,21 @@ int main( int argc, char **argv ) {
   for( ;; ) {                                       /* main loop */
 
     network_wait();                                 /* wait for clients */
-    
+    if (fd >= 0){
+      semaphore_wait(WORK.mutex);
+      if(WORK.nodeNumber == MAX_REQUESTS)
+        printf("Node number : %d. Too many clients. Waiting for processing...\n",WORK.nodeNumber);
+      semaphore_signal(WORK.mutex);
+      semaphore_wait(spaces);
+    }
     for( fd = network_open(); fd >= 0; fd = network_open() ) { /* get clients */
       saveToWorkQueue(fd); 
+      semaphore_wait(WORK.mutex);
+      
+      if(WORK.nodeNumber == MAX_REQUESTS)
+        printf("Node number : %d. Too many clients. Waiting for processing...\n",WORK.nodeNumber);
+      semaphore_signal(WORK.mutex);
+      semaphore_wait(spaces);
     }
   }
 }
@@ -359,9 +371,12 @@ void preprocessingRequest(Request *request){
       stat(req, &st);
       request->filePath = (char*)check_malloc(strlen(req)+1);
       strcpy(request->filePath,req);
+      //request->cfd = cfd;
       request->file = fin;
       request->remainingBytes = st.st_size;
       request->fileSize = st.st_size;
+      //request->remainingBytes = cache_filesize(request->cfd);
+      //request->fileSize = request->remainingBytes;
       printf("File path : %s\n",request->filePath);
       fflush(stdout);
       printf("File size : %d\n",request->fileSize);
@@ -400,8 +415,8 @@ void* worker_entry(void *args){
     else{
       semaphore_signal(WORK.mutex);
       Request *request = queue_pop(&WORK);
-      preprocessingRequest(request);
       semaphore_signal(spaces);
+      preprocessingRequest(request);
       if (flag == 0)
         semaphore_wait(items);
       else
@@ -414,7 +429,8 @@ void* worker_entry(void *args){
 void saveToWorkQueue(int fd){
   Request *request = (Request*)malloc(sizeof(Request));
   request->fileDes = fd;
-  semaphore_wait(spaces);
+  //semaphore_wait(spaces);
   queue_push(&WORK,request);
+  printf(" Save %d to WORK queue\n",fd);
   semaphore_signal(items);
 }
